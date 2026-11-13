@@ -13,40 +13,52 @@ Rule 3 of the roadmap: *one pinned MediaPipe Tasks model and one features.py for
 
 Both released 11 Nov 2026. Never use `@latest` in app code.
 
-## 2. Model choice: Hand Landmarker + Pose Landmarker (lite)
+## 2. Model choice: Hand Landmarker + Pose Landmarker lite + Face Landmarker every 3rd frame
 
-Roadmap rule: Holistic Landmarker if the phone holds ≥ 15 FPS, otherwise Hand + Pose.
+Roadmap rule: Holistic Landmarker if the phone holds ≥ 15 FPS, otherwise Hand + Pose. Facial expressions carry part of PSL meaning, so a second test (13 Nov 2026) checked ways to keep the face.
 
-Phone test, 13 Nov 2026 (`fps_test/`, results in `fps_test/results/`): iPhone, iOS 26.6.1, Chrome, front camera 480×640, GPU delegate, signing in front of the camera, 3 runs × 15 s:
+Test phone: iPhone, iOS 26.6.1, Chrome, front camera 480×640, GPU delegate, signing continuously. Test page `fps_test/` (v1: 3 runs × 15 s; v2: 1 run × 30 s). Raw results in `fps_test/results/`.
 
-| Setup | FPS (mean of 3) | ms / frame | p95 ms | both hands found |
+| Setup | FPS | ms / frame | p95 ms | Face? |
 |---|---|---|---|---|
-| Holistic | **12.4** ✗ | 77 | 101–105 | 92–94% |
-| Hand + Pose (full) | 16.2 | 58 | 78–82 | 85–86% |
-| Hand + Pose (lite) | **18.0** ✓ | 52 | 73–74 | 86–94% |
+| Holistic (v1 mean of 3, v2) | 12.4, 12.6 ✗ | 77 | 101–105 | full |
+| Hand + Pose full (v1) | 16.2 | 58 | 78–82 | no |
+| Hand + Pose lite (v1 mean, v2) | 18.0, 18.2 | 52 | 73–75 | no |
+| Hand + Pose lite + Face every frame | 13.5 ✗ | 72 | 98 | full |
+| Hand + Pose lite + Face every 2nd frame | 15.4 | 62 | 91 | full, ~8×/s |
+| **Hand + Pose lite + Face every 3rd frame** | **16.0** ✓ | 60 | 90 | full, ~5×/s |
 
-Decision: **Hand Landmarker + Pose Landmarker lite.**
-- Holistic misses the 15 FPS bar in all three runs.
-- Pose *full* passes by only 1 FPS. The real app also draws the UI, builds features and sends requests, so it would drop under 15. Lite leaves ~3 FPS of headroom.
-- Lite's lower pose accuracy matters little here: finger detail comes from the Hand model, and pose is only used for head, shoulders, elbows and wrists.
-- Cost: no FaceMesh. The ~20 face points in the plan are replaced by the 11 face points of the pose model (nose, eyes, ears, mouth corners). Eyebrow and detailed mouth shapes are lost; this is a known limitation for PSL non-manual signals and goes in the final report.
+**Decision: Hand + Pose lite on every frame, Face Landmarker on every 3rd frame (last face held in between).**
+- Holistic misses 15 FPS in all four runs.
+- Hands move fast and need every frame; brows and mouth change more slowly, so ~5 face updates per second still catches a raised brow or mouth shape that lasts most of a sign.
+- Every 2nd frame passes by only 0.4 FPS; every 3rd gives 1 FPS headroom, which is still thin.
+
+**Safety valve (decided by data, not by guess):**
+- A2 (offline, Python) extracts the face block for every take; speed does not matter offline.
+- A4 trains the baseline with and without the face block on the LOSO folds.
+- If the face adds less than ~2 points of top-1, the live app drops it and runs Hand + Pose lite at ~18 FPS.
+- If A7's live prototype falls below 15 FPS with the face, it switches to every 4th frame or drops the face, and reports the fold accuracy without face.
 
 | Model file | Bytes | SHA-256 |
 |---|---|---|
 | `hand_landmarker.task` (float16) | 7,819,105 | `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1` |
 | `pose_landmarker_lite.task` (float16) | 5,777,746 | `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a` |
+| `face_landmarker.task` (float16) | 3,758,596 | `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff` |
 
-Both files are served from the app's own static hosting and loaded in Python from the same files, never from the `latest` URL at run time.
+The files are served from the app's own static hosting and loaded in Python from the same files, never from the `latest` URL at run time.
 
-Open item: the test phone is an iPhone. If the team plans to use an Android phone in the hospital, run the same page on it once; if Hand + Pose lite is under 15 FPS there, revisit.
+Open items:
+- The test phone is an iPhone. If an Android phone will be used, run the same page on it once.
+- **Frame-rate mismatch for A1:** training videos are 30 fps, but the live app gets ~16 landmark frames per second. A1 should resample training clips to 15 fps (or A3 resamples every sequence to a fixed length), so the model sees the same timing in training and live use.
 
-## 3. Landmark subset (`landmark_subset.json`, subset-v1)
+## 3. Landmark subset (`landmark_subset.json`, subset-v2)
 
-Per frame, 59 landmarks / 194 values:
-- Pose 0–16 (x, y, z, visibility): face proxy 0–10, shoulders, elbows, wrists.
+Per frame, 80 landmarks / 257 values:
+- Pose 0–16 (x, y, z, visibility): coarse face points 0–10, shoulders, elbows, wrists.
 - Left hand 21 × (x, y, z), right hand 21 × (x, y, z).
+- Face 21 × (x, y, z) from FaceMesh: forehead, nose tip, chin, cheeks, 3 points per eyebrow, upper and lower eyelid per eye, mouth corners, outer and inner lips. Updated every 3rd frame, held in between. Optional block (see safety valve).
 - Hand slots are assigned by the nearest pose wrist, not by MediaPipe's handedness label.
-- A missing hand is NaN; filling is decided in A3.
+- Missing values are NaN; filling is decided in A3.
 
 ## 4. Task settings (same on both sides)
 
@@ -55,6 +67,7 @@ Per frame, 59 landmarks / 194 values:
 | Running mode | VIDEO (timestamps in ms, strictly increasing) |
 | Hand | `numHands: 2`, detection / presence / tracking confidence 0.5 |
 | Pose | `numPoses: 1`, detection / presence / tracking confidence 0.5, no segmentation mask |
+| Face | `numFaces: 1`, confidence 0.5, no blendshapes, run when `frame_index % 3 == 0` |
 | Input frames | unmirrored, RGB; video preprocessed by A1 (rotation applied, SDR, 30 fps) |
 | Delegate | browser: GPU, CPU fallback · Python: CPU |
 

@@ -1,0 +1,46 @@
+{
+ "device": "iPhone, iOS 26.6.1, Chrome 157",
+ "page_version": 2,
+ "delegate": "GPU",
+ "camera": "front 480x640@30",
+ "date": "2026-11-13",
+ "seconds_per_test": 30,
+ "results": {
+  "Holistic": [
+   12.6,
+   76.5,
+   103,
+   "92%"
+  ],
+  "Hand+Pose lite": [
+   18.2,
+   52.0,
+   75,
+   "90%"
+  ],
+  "Hand+Pose lite+Face every frame": [
+   13.5,
+   71.6,
+   98,
+   "80%"
+  ],
+  "Hand+Pose lite+Face every 2nd": [
+   15.4,
+   62.3,
+   91,
+   "90%"
+  ],
+  "Hand+Pose lite+Face every 3rd": [
+   16.0,
+   59.9,
+   90,
+   "88%"
+  ]
+ },
+ "columns": [
+  "fps",
+  "mean_ms",
+  "p95_ms",
+  "two_hands_detected"
+ ]
+}

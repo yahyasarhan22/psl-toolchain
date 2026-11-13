@@ -4,9 +4,9 @@ T1 of the PSL hospital communication project (ENCS5200, Section 35): lock the la
 
 | Piece | Status |
 |---|---|
-| `fps_test/` – phone FPS test (Holistic vs Hand + Pose) | done: Hand + Pose lite chosen |
+| `fps_test/` – phone FPS test (Holistic vs Hand + Pose) | done: Hand + Pose lite + Face every 3rd frame |
 | Python extractor, pinned versions | to do |
-| Landmark subset (`landmark_subset.json`) | done (subset-v1) |
+| Landmark subset (`landmark_subset.json`) | done (subset-v2, 80 points) |
 | Parity test (Python vs browser, 5 clips) | to do |
 | `TOOLCHAIN.md` | draft |
 
