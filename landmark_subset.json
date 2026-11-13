@@ -1,0 +1,23 @@
+{
+  "version": "subset-v1",
+  "decided": "2026-11-13 (T1)",
+  "models": {
+    "hand": "hand_landmarker.task  (sha256 fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1)",
+    "pose": "pose_landmarker_lite.task  (sha256 59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a)"
+  },
+  "frame_layout": [
+    {"block": "pose_upper", "source": "PoseLandmarker", "count": 17, "fields": ["x", "y", "z", "visibility"],
+     "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+     "names": ["nose", "left_eye_inner", "left_eye", "left_eye_outer", "right_eye_inner", "right_eye", "right_eye_outer",
+               "left_ear", "right_ear", "mouth_left", "mouth_right", "left_shoulder", "right_shoulder",
+               "left_elbow", "right_elbow", "left_wrist", "right_wrist"],
+     "note": "Indices 0-10 are the face proxy (head position/turn, mouth corners) that replaces the ~20 FaceMesh points, because the face model is dropped with Hand+Pose. 11-16 = shoulders, elbows, wrists. Hips and legs are excluded (often out of frame when seated)."},
+    {"block": "left_hand", "source": "HandLandmarker", "count": 21, "fields": ["x", "y", "z"], "indices": "0-20"},
+    {"block": "right_hand", "source": "HandLandmarker", "count": 21, "fields": ["x", "y", "z"], "indices": "0-20"}
+  ],
+  "total_landmarks": 59,
+  "values_per_frame": 194,
+  "hand_slot_rule": "A detected hand goes to the left_hand or right_hand slot by the nearer pose wrist (15 = signer's left wrist, 16 = signer's right wrist), using the hand's landmark 0 (wrist). MediaPipe's handedness label is stored for reference only: it assumes a mirrored selfie image and flips between frames. If both hands land on the same wrist, the closer one keeps the slot and the other takes the free slot.",
+  "missing_rule": "A hand that is not detected in a frame is stored as NaN (all 63 values). A3 decides interpolation and masking; extraction never invents values.",
+  "coordinates": "Normalized image coordinates as MediaPipe returns them (x, y in 0..1 of the unmirrored frame; z relative). Normalization to the body (shoulder centre, shoulder width) happens in A3 features.py, not here."
+}

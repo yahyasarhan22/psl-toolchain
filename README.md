@@ -4,11 +4,11 @@ T1 of the PSL hospital communication project (ENCS5200, Section 35): lock the la
 
 | Piece | Status |
 |---|---|
-| `fps_test/` – phone FPS test (Holistic vs Hand + Pose) | ready |
+| `fps_test/` – phone FPS test (Holistic vs Hand + Pose) | done: Hand + Pose lite chosen |
 | Python extractor, pinned versions | to do |
-| Landmark subset | to do |
+| Landmark subset (`landmark_subset.json`) | done (subset-v1) |
 | Parity test (Python vs browser, 5 clips) | to do |
-| `TOOLCHAIN.md` | to do |
+| `TOOLCHAIN.md` | draft |
 
 Pinned: `mediapipe==1.2.3` (Python) and `@mediapipe/tasks-vision@1.2.3` (browser).
 
