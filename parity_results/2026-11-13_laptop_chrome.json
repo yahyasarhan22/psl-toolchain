@@ -1,0 +1,452 @@
+{
+ "what": "T1 parity run 2: real browser on Yahya's laptop (Windows, Chrome 157), clips decoded by the browser (video seek), Python refs decoded by OpenCV",
+ "date": "2026-11-13",
+ "overall_frame_match_pct": {
+  "CPU": 90.9,
+  "GPU": 74.3,
+  "CPU vs GPU": 75.8
+ },
+ "env": {
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+  "subset": "subset-v2",
+  "lib": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/",
+  "date": "2026-11-13T13:34:35.655Z"
+ },
+ "rows": [
+  {
+   "clip": "head_take_01.mp4",
+   "delegate": "CPU",
+   "frames": 110,
+   "match": 78.2,
+   "errPx": {
+    "pose": {
+     "median": 2.14,
+     "p95": 6.33,
+     "n": 110
+    },
+    "hands": {
+     "median": 0.9,
+     "p95": 13.92,
+     "n": 83
+    },
+    "face": {
+     "median": 0.26,
+     "p95": 1.25,
+     "n": 92
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 96.4,
+    "R": 86.4,
+    "face": 97.3
+   }
+  },
+  {
+   "clip": "head_take_01.mp4",
+   "delegate": "GPU",
+   "frames": 110,
+   "match": 46.4,
+   "errPx": {
+    "pose": {
+     "median": 4.48,
+     "p95": 7.94,
+     "n": 110
+    },
+    "hands": {
+     "median": 2.2,
+     "p95": 14.47,
+     "n": 79
+    },
+    "face": {
+     "median": 0.4,
+     "p95": 0.7,
+     "n": 89
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 93.6,
+    "R": 78.2,
+    "face": 94.5
+   }
+  },
+  {
+   "clip": "head_take_01.mp4",
+   "delegate": "CPU vs GPU",
+   "frames": 110,
+   "match": 53.6,
+   "errPx": {
+    "pose": {
+     "median": 4.31,
+     "p95": 7.18,
+     "n": 110
+    },
+    "hands": {
+     "median": 2.4,
+     "p95": 14.27,
+     "n": 80
+    },
+    "face": {
+     "median": 0.41,
+     "p95": 1.37,
+     "n": 92
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 93.6,
+    "R": 77.3,
+    "face": 97.3
+   }
+  },
+  {
+   "clip": "letter_ha_take_03.mp4",
+   "delegate": "CPU",
+   "frames": 71,
+   "match": 91.5,
+   "errPx": {
+    "pose": {
+     "median": 2.51,
+     "p95": 5.11,
+     "n": 71
+    },
+    "hands": {
+     "median": 0.16,
+     "p95": 15.06,
+     "n": 58
+    },
+    "face": {
+     "median": 0.29,
+     "p95": 0.68,
+     "n": 71
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 95.8,
+    "R": 100,
+    "face": 100
+   }
+  },
+  {
+   "clip": "letter_ha_take_03.mp4",
+   "delegate": "GPU",
+   "frames": 71,
+   "match": 74.6,
+   "errPx": {
+    "pose": {
+     "median": 5.39,
+     "p95": 8.59,
+     "n": 71
+    },
+    "hands": {
+     "median": 1.25,
+     "p95": 13.16,
+     "n": 58
+    },
+    "face": {
+     "median": 0.53,
+     "p95": 0.86,
+     "n": 71
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 97.2,
+    "R": 100,
+    "face": 100
+   }
+  },
+  {
+   "clip": "letter_ha_take_03.mp4",
+   "delegate": "CPU vs GPU",
+   "frames": 71,
+   "match": 80.3,
+   "errPx": {
+    "pose": {
+     "median": 5.08,
+     "p95": 7.82,
+     "n": 71
+    },
+    "hands": {
+     "median": 1.22,
+     "p95": 5.48,
+     "n": 58
+    },
+    "face": {
+     "median": 0.48,
+     "p95": 0.63,
+     "n": 71
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 95.8,
+    "R": 100,
+    "face": 100
+   }
+  },
+  {
+   "clip": "number_7_take_06.mp4",
+   "delegate": "CPU",
+   "frames": 66,
+   "match": 98.5,
+   "errPx": {
+    "pose": {
+     "median": 1.15,
+     "p95": 1.59,
+     "n": 66
+    },
+    "hands": {
+     "median": 0.12,
+     "p95": 0.68,
+     "n": 128
+    },
+    "face": {
+     "median": 0.17,
+     "p95": 0.28,
+     "n": 66
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 100,
+    "face": 100
+   }
+  },
+  {
+   "clip": "number_7_take_06.mp4",
+   "delegate": "GPU",
+   "frames": 66,
+   "match": 84.8,
+   "errPx": {
+    "pose": {
+     "median": 3.15,
+     "p95": 4.05,
+     "n": 66
+    },
+    "hands": {
+     "median": 0.69,
+     "p95": 4.6,
+     "n": 125
+    },
+    "face": {
+     "median": 0.31,
+     "p95": 0.42,
+     "n": 66
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 92.4,
+    "face": 100
+   }
+  },
+  {
+   "clip": "number_7_take_06.mp4",
+   "delegate": "CPU vs GPU",
+   "frames": 66,
+   "match": 86.4,
+   "errPx": {
+    "pose": {
+     "median": 3.23,
+     "p95": 3.87,
+     "n": 66
+    },
+    "hands": {
+     "median": 0.68,
+     "p95": 4.27,
+     "n": 125
+    },
+    "face": {
+     "median": 0.28,
+     "p95": 0.36,
+     "n": 66
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 92.4,
+    "face": 100
+   }
+  },
+  {
+   "clip": "pain_take_05.mp4",
+   "delegate": "CPU",
+   "frames": 85,
+   "match": 100,
+   "errPx": {
+    "pose": {
+     "median": 1.21,
+     "p95": 2.74,
+     "n": 85
+    },
+    "hands": {
+     "median": 0.13,
+     "p95": 0.27,
+     "n": 164
+    },
+    "face": {
+     "median": 0.14,
+     "p95": 0.23,
+     "n": 85
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 100,
+    "face": 100
+   }
+  },
+  {
+   "clip": "pain_take_05.mp4",
+   "delegate": "GPU",
+   "frames": 85,
+   "match": 96.5,
+   "errPx": {
+    "pose": {
+     "median": 3.41,
+     "p95": 4.99,
+     "n": 85
+    },
+    "hands": {
+     "median": 0.75,
+     "p95": 1.98,
+     "n": 163
+    },
+    "face": {
+     "median": 0.26,
+     "p95": 0.38,
+     "n": 85
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 97.6,
+    "face": 100
+   }
+  },
+  {
+   "clip": "pain_take_05.mp4",
+   "delegate": "CPU vs GPU",
+   "frames": 85,
+   "match": 96.5,
+   "errPx": {
+    "pose": {
+     "median": 3.57,
+     "p95": 4.83,
+     "n": 85
+    },
+    "hands": {
+     "median": 0.74,
+     "p95": 1.96,
+     "n": 163
+    },
+    "face": {
+     "median": 0.27,
+     "p95": 0.38,
+     "n": 85
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 97.6,
+    "face": 100
+   }
+  },
+  {
+   "clip": "where_take_03.mp4",
+   "delegate": "CPU",
+   "frames": 119,
+   "match": 91.6,
+   "errPx": {
+    "pose": {
+     "median": 2.44,
+     "p95": 4.54,
+     "n": 119
+    },
+    "hands": {
+     "median": 0.72,
+     "p95": 5.92,
+     "n": 231
+    },
+    "face": {
+     "median": 0.49,
+     "p95": 0.76,
+     "n": 119
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 96.6,
+    "face": 100
+   }
+  },
+  {
+   "clip": "where_take_03.mp4",
+   "delegate": "GPU",
+   "frames": 119,
+   "match": 78.2,
+   "errPx": {
+    "pose": {
+     "median": 3.84,
+     "p95": 6.7,
+     "n": 119
+    },
+    "hands": {
+     "median": 1.6,
+     "p95": 10,
+     "n": 228
+    },
+    "face": {
+     "median": 0.53,
+     "p95": 0.97,
+     "n": 119
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 92.4,
+    "face": 100
+   }
+  },
+  {
+   "clip": "where_take_03.mp4",
+   "delegate": "CPU vs GPU",
+   "frames": 119,
+   "match": 73.1,
+   "errPx": {
+    "pose": {
+     "median": 4.51,
+     "p95": 6.09,
+     "n": 119
+    },
+    "hands": {
+     "median": 1.67,
+     "p95": 10.06,
+     "n": 229
+    },
+    "face": {
+     "median": 0.57,
+     "p95": 0.83,
+     "n": 119
+    }
+   },
+   "presence": {
+    "pose": 100,
+    "L": 100,
+    "R": 94.1,
+    "face": 100
+   }
+  }
+ ]
+}

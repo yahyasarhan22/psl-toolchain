@@ -1,6 +1,6 @@
-# TOOLCHAIN.md — PSL project, step T1 (draft)
+# TOOLCHAIN.md — PSL project, step T1
 
-Status: **in progress** (decisions 1–3 done 13 Nov 2026; Python extractor and parity test still to do).
+Status: **done, 13 Nov 2026.** Summary of decisions in section 8.
 
 Rule 3 of the roadmap: *one pinned MediaPipe Tasks model and one features.py for training and the live app.* This file is the single place that says which.
 
@@ -89,10 +89,46 @@ Dataset v1 is filmed full-body: the face is only ~75–95 px wide in a 720 px fr
 - On CPU the two runtimes give the same landmarks; remaining mismatches are borderline detections (a resting hand at the edge of the 0.5 threshold, the hand over the face in "head").
 - The GPU delegate computes with lower precision, so borderline detections flip more often. SwiftShader is not a real GPU, so this number is only a warning. Run 2 measures real devices.
 
-**Run 2 (to do): real browsers.** Laptop Chrome and the iPhone, CPU and GPU, with `web/parity/` (video frames decoded by the browser, as in the live app). Decision rule: if real-GPU parity is < 95%, measure the final pipeline on the phone with the CPU delegate; use CPU if it holds ≥ 15 FPS, otherwise keep GPU and report the parity number.
+**Run 2, 13 Nov 2026: real browser on the team laptop** (Windows, Chrome 157; the browser decodes the MP4 itself, Python decodes with OpenCV, as in real training vs live use). `parity_results/2026-11-13_laptop_chrome.json`.
+
+| Comparison | Frames matching (451) | Hands err median per clip | Pose err median per clip | Face err median |
+|---|---|---|---|---|
+| Python ↔ laptop **CPU** | **90.9%** (78.2 / 91.5 / 98.5 / 100 / 91.6) | 0.1–0.9 px | 1.2–2.5 px | 0.1–0.5 px |
+| Python ↔ laptop **GPU** | **74.3%** (46.4 / 74.6 / 84.8 / 96.5 / 78.2) | 0.7–2.2 px | 3.2–5.4 px | 0.3–0.5 px |
+| laptop CPU ↔ laptop GPU | 75.8% | 0.7–2.4 px | 3.2–5.1 px | 0.3–0.6 px |
+
+Phone speed of the final pipeline (`fps_test/` v3, iPhone, `fps_test/results/2026-11-13_iphone_chrome_v3_gpu_cpu.json`):
+
+| Setup | GPU FPS | CPU FPS |
+|---|---|---|
+| Holistic | 12.3 | 14.1 |
+| Hand + Pose lite | 18.3 | 15.2 |
+| Hand + Pose lite + Face every 3rd (full frame) | 16.7 | 12.9 |
+| **Final pipeline** (`landmarks.js`, face from head crop every 3rd) | **14.8** | 11.3 |
+
+What the numbers say:
+- Frame match is a strict test (one hand found on one side and not the other fails the whole frame). Most failures are borderline hands: a resting or half-visible hand near the 0.5 presence threshold, and the hand over the face in "head". Where both sides find a block, the coordinates differ by about a pixel for hands and face and 2–5 px for pose (shoulder width is ~150–200 px).
+- Decoder differences (browser vs OpenCV) cost ~5 points (96.2% → 90.9% on CPU). The GPU's lower precision costs another ~17 points.
+- The phone cannot run the final pipeline on CPU fast enough (11.3 FPS), so the live app has to use the GPU.
 
 Note: headless Chrome in the container does not repaint video frames on seek (it fed the same frame every time); the parity page now refuses to run in a browser that does this.
 
 ## 7. Python environment
 
 `python/requirements.txt`: `mediapipe==1.2.3`, `opencv-contrib-python==5.0.0.93`, `numpy==2.2.6` (Python 3.10–3.13). Run 1 used Python 3.13 on Linux x86-64. On a Linux machine without graphics, MediaPipe needs `libEGL.so.1` (package `libegl1`); Windows does not.
+
+## 8. Decisions (T1 closed 13 Nov 2026)
+
+1. **Versions:** `mediapipe==1.2.3` (Python) and `@mediapipe/tasks-vision@1.2.3` (browser). Never `latest`.
+2. **Models:** Hand Landmarker + Pose Landmarker lite on every frame, Face Landmarker every 3rd frame on a head crop. Files and hashes in `models/`; both extractors refuse a file with a different hash.
+3. **Landmark subset:** subset-v2, 80 points / 257 values per frame (`landmark_subset.json`).
+4. **One extractor per side, same maths:** `python/extract_landmarks.py` (training, A2) and `web/landmarks.js` (live app, C3).
+5. **Delegates:** Python = CPU. Live app = **GPU** (phone CPU only reaches 11.3 FPS).
+6. **Speed:** the final pipeline runs at 14.8 FPS on the test iPhone, inside the "~15 FPS" rule's run-to-run noise (±0.4). If the live prototype (A7) measures under 14 FPS, switch the face to every 4th frame on both sides, or drop the face if A4 shows it adds less than ~2 points.
+7. **Training must absorb the GPU differences** (landmark parity on GPU is 74%, below the 95% target):
+   - A1 resamples training clips to 15 fps, matching the live landmark rate.
+   - A3/A5 augmentation sized from run 2: coordinate jitter ≈ 0.5% of frame width on hands/face and ≈ 1% on pose, plus dropping a whole hand in ~10% of frames. The model must not rely on a borderline hand being present.
+   - **I1's "parity ≥ 95%" means prediction parity:** on the held-out signer's clips, the trained model's top-1 from Python landmarks and from phone-GPU landmarks must agree on ≥ 95% of clips. If it fails: first train with heavier augmentation; second, extract the training set with `web/landmarks.js` on GPU (same runtime as the app).
+8. **Face crop:** required; FaceLandmarker on the full frame misses small faces (0% on 3 of 5 dataset clips).
+
+Open items for later steps: test one Android phone if one will be used; A4 with/without-face comparison; A7 live FPS check.
