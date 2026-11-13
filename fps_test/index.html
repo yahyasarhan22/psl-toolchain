@@ -30,7 +30,7 @@
 </head>
 <body>
 <h1>PSL T1 · Phone FPS test</h1>
-<p class="sub">Version 2 · MediaPipe Tasks Vision <b>1.2.3</b> (pinned). Prop the phone up, stand ~1.5 m away so your head, chest and both hands are in view, and sign or move your hands the whole time.</p>
+<p class="sub">Version 3 · MediaPipe Tasks Vision <b>1.2.3</b> (pinned). Prop the phone up, stand ~1.5 m away so your head, chest and both hands are in view, and sign or move your hands the whole time.</p>
 
 <div class="card">
   <div class="row">
@@ -43,10 +43,10 @@
     <input id="cond" placeholder="Notes: e.g. Low Power off, Safari, window light" style="flex:1;min-width:220px;font:inherit;border-radius:8px;border:1px solid #2c313c;background:#222631;color:var(--fg);padding:8px">
   </div>
   <div class="row" style="margin-top:8px">
-    <button class="primary" id="runAll">Run all 5 tests</button>
+    <button class="primary" id="runAll">Run all 4 tests</button>
     <button id="copy" disabled>Copy results</button>
   </div>
-  <div id="status">Tap "Run all 5 tests" and allow the camera.</div>
+  <div id="status">Tap "Run all 4 tests" and allow the camera.</div>
   <div id="live"></div>
 </div>
 
@@ -69,7 +69,7 @@
 </div>
 
 <script type="module">
-const VER = "1.2.3"; const PAGE_VERSION = 2;
+const VER = "1.2.3"; const PAGE_VERSION = 3;
 const { FilesetResolver, HolisticLandmarker, HandLandmarker, PoseLandmarker, FaceLandmarker } =
   await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/vision_bundle.mjs`);
 
@@ -81,7 +81,7 @@ const MODELS = {
   pose_lite: `${M}/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task`,
   face:      `${M}/face_landmarker/face_landmarker/float16/latest/face_landmarker.task`,
 };
-const SETUPS = ["Holistic", "Hand + Pose lite", "Hand + Pose lite + Face (every frame)", "Hand + Pose lite + Face (every 2nd frame)", "Hand + Pose lite + Face (every 3rd frame)"];
+const SETUPS = ["Holistic", "Hand + Pose lite", "Hand + Pose lite + Face (every 3rd frame)", "Final pipeline (landmarks.js)"];
 
 const $ = id => document.getElementById(id);
 const video = $("video"), canvas = $("overlay"), ctx = canvas.getContext("2d");
@@ -122,6 +122,21 @@ function baseOpts(key) {
 }
 
 async function makeSetup(name) {
+  if (name.startsWith("Final")) {
+    const { createExtractor } = await import("../web/landmarks.js");
+    const ex = await createExtractor({ lib: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/`, models: "../models/", delegate: $("delegate").value });
+    const off = document.createElement("canvas"); let k = 0;
+    return {
+      run(ts) {
+        off.width = video.videoWidth; off.height = video.videoHeight;
+        off.getContext("2d", { willReadFrequently: true }).drawImage(video, 0, 0);
+        const v = ex.processFrame(off, k++, ts);
+        const pts = (s, n, st) => v[s] === null ? null : Array.from({ length: n }, (_, j) => ({ x: v[s + j * st], y: v[s + j * st + 1] }));
+        return { hands: [pts(68, 21, 3), pts(131, 21, 3)].filter(Boolean), pose: pts(0, 17, 4), face: pts(194, 21, 3), hasFace: true };
+      },
+      close() { ex.close(); },
+    };
+  }
   if (name === "Holistic") {
     await loadModel("holistic");
     const h = await HolisticLandmarker.createFromOptions(vision, {
@@ -169,7 +184,7 @@ function draw(o) {
   const dot = (p, c, r = 3) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p.x * canvas.width, p.y * canvas.height, r, 0, 7); ctx.fill(); };
   if (o.pose) o.pose.slice(0, 25).forEach(p => dot(p, "#5b8cff", 4));
   o.hands.forEach(h => h.forEach(p => dot(p, "#3ecf8e", 3)));
-  if (o.face) for (let i = 0; i < o.face.length; i += 12) dot(o.face[i], "#ffb020", 1.5);
+  if (o.face) for (let i = 0; i < o.face.length; i += (o.face.length > 100 ? 12 : 1)) dot(o.face[i], "#ffb020", 1.5);
 }
 
 function pct(a, n) { return n ? Math.round(100 * a / n) + "%" : "–"; }

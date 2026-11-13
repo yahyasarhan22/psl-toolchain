@@ -135,7 +135,7 @@
         "lip_lower_inner"
       ],
       "optional": true,
-      "note": "Eyebrows (raise/frown), eye opening, mouth shape and head frame. R/L = signer's own right/left. Updated every 3rd frame and held in between (same rule in Python and browser). Kept in the live app only if the A4 with/without-face comparison shows it helps."
+      "note": "Eyebrows (raise/frown), eye opening, mouth shape and head frame. R/L = signer's own right/left. Updated every 3rd frame from a head crop and held in between (same rule in Python and browser). Kept in the live app only if the A4 with/without-face comparison shows it helps."
     }
   ],
   "total_landmarks": 80,
@@ -143,5 +143,5 @@
   "hand_slot_rule": "A detected hand goes to the left_hand or right_hand slot by the nearer pose wrist (15 = signer's left wrist, 16 = signer's right wrist), using the hand's landmark 0 (wrist). MediaPipe's handedness label is stored for reference only: it assumes a mirrored selfie image and flips between frames. If both hands land on the same wrist, the closer one keeps the slot and the other takes the free slot.",
   "missing_rule": "A hand that is not detected in a frame is stored as NaN (all 63 values). A3 decides interpolation and masking; extraction never invents values.",
   "coordinates": "Normalized image coordinates as MediaPipe returns them (x, y in 0..1 of the unmirrored frame; z relative). Normalization to the body (shoulder centre, shoulder width) happens in A3 features.py, not here.",
-  "face_update_rule": "Run FaceLandmarker on frames where frame_index % 3 == 0; other frames copy the last face result. If no face yet, NaN."
+  "face_update_rule": "Every 3rd frame (frame_index % 3 == 0): cut a square around the head from the pose points (side = 3 x max(ear-to-ear distance, 1.5 x outer-eye distance), min 64 px, centred on the ear midpoint, kept inside the frame), run FaceLandmarker in IMAGE mode on that crop, and map the points back to full-frame coordinates. Other frames copy the last face. No pose -> no face (NaN). Reason: in dataset v1 the face is only ~75-95 px wide in a 720 px frame and FaceLandmarker on the full frame found it in 0% of frames for 3 of 5 parity clips; with the crop it finds it in 83-100% (misses are the hand covering the face)."
 }

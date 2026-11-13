@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSL T1 · Parity test (Python vs browser)</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --fg:#e8eaf0; --mut:#9aa3b2; --ok:#3ecf8e; --bad:#ff6b6b; --acc:#5b8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--fg); padding:12px; }
+  h1 { font-size:18px; margin:0 0 4px; } p.sub { margin:0 0 12px; color:var(--mut); font-size:13px; }
+  .card { background:var(--card); border-radius:12px; padding:12px; margin-bottom:12px; }
+  label { display:block; color:var(--mut); font-size:13px; margin:6px 0; }
+  button { font:inherit; border-radius:8px; border:1px solid #2c313c; background:#222631; color:var(--fg); padding:8px 12px; }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:left; padding:5px 4px; border-bottom:1px solid #2c313c; } th { color:var(--mut); font-weight:500; }
+  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  pre { white-space:pre-wrap; font-size:12px; background:#0b0d11; padding:8px; border-radius:8px; max-height:300px; overflow:auto; }
+  canvas { max-width:160px; border-radius:8px; }
+</style>
+</head>
+<body>
+<h1>PSL T1 · Parity test</h1>
+<p class="sub">Checks that the browser (MediaPipe Tasks Vision 1.2.3, CPU and GPU) gives the same landmarks as Python (mediapipe 1.2.3) on the same frames. Nothing is uploaded: files stay on this device.</p>
+
+<div class="card">
+  <label>1. The 5 parity clips (<code>T1_parity/clips/*.mp4</code>) <input type="file" id="clips" accept="video/mp4" multiple></label>
+  <label>2. The Python results (<code>T1_parity/python_out/*.python.json</code>) <input type="file" id="refs" accept=".json,application/json" multiple></label>
+  <label>Delegates <select id="dels"><option value="CPU,GPU" selected>CPU and GPU</option><option value="GPU">GPU only</option><option value="CPU">CPU only</option></select></label>
+  <button class="primary" id="run">Run parity test</button>
+  <button id="copy" disabled>Copy summary</button>
+  <div id="status" style="margin-top:8px;font-weight:600"></div>
+</div>
+
+<div class="card"><table id="tbl"><thead><tr>
+  <th>Clip</th><th>Delegate</th><th>Frames</th><th>Frame match</th><th>Pose err px (med/p95)</th><th>Hands err px</th><th>Face err px</th><th>Presence agree (pose/L/R/face)</th>
+</tr></thead><tbody></tbody></table>
+<p class="sub" style="margin-top:8px">A frame matches when every block (pose, left hand, right hand, face) is found on both sides or missing on both, and each found block is on average within 1% of the frame width (7 px at 720 px). Pass: ≥ 95% of frames match.</p></div>
+
+<div class="card"><b>Summary to paste back</b><pre id="out">(none yet)</pre></div>
+<canvas id="cv"></canvas>
+
+<script type="module">
+const params = new URLSearchParams(location.search);
+const LIB = params.get("lib") || "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/";
+const MODELS = params.get("models") || "https://storage.googleapis.com/mediapipe-models/__by_name__/";
+const MODEL_URLS = {
+  "hand_landmarker.task": "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+  "pose_landmarker_lite.task": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
+  "face_landmarker.task": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+};
+const { createExtractor, SUBSET_VERSION } = await import(params.get("mod") || "../landmarks.js");
+
+// models: either a base URL holding all three files, or the official URLs
+const realFetch = window.fetch.bind(window);
+if (!params.get("models")) window.fetch = (u, o) => {
+  const m = String(u).match(/__by_name__\/(.+)$/); return realFetch(m ? MODEL_URLS[m[1]] : u, o);
+};
+
+const $ = id => document.getElementById(id);
+const BLOCKS = { pose: [0, 68, 4], L: [68, 131, 3], R: [131, 194, 3], face: [194, 257, 3] };
+
+function blockErr(a, b, [s, e, st], W, H) {
+  let sum = 0, n = 0;
+  for (let k = s; k < e; k += st) { sum += Math.hypot((a[k] - b[k]) * W, (a[k + 1] - b[k + 1]) * H); n++; }
+  return sum / n;
+}
+const pct = (x, n) => n ? Math.round(1000 * x / n) / 10 : 0;
+function q(arr, p) { if (!arr.length) return null; const s = [...arr].sort((x, y) => x - y); return +s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))].toFixed(2); }
+
+function compare(ref, test, W, H) {
+  const N = Math.min(ref.length, test.length), errs = { pose: [], hands: [], face: [] }, agree = { pose: 0, L: 0, R: 0, face: 0 };
+  let match = 0; const thr = 0.01 * W;
+  for (let f = 0; f < N; f++) {
+    let ok = true;
+    for (const [name, blk] of Object.entries(BLOCKS)) {
+      const pa = ref[f][blk[0]] !== null, pb = test[f][blk[0]] !== null;
+      if (pa === pb) agree[name]++; else ok = false;
+      if (pa && pb) {
+        const e = blockErr(ref[f], test[f], blk, W, H);
+        (name === "L" || name === "R" ? errs.hands : errs[name]).push(e);
+        if (e > thr) ok = false;
+      }
+    }
+    if (ok) match++;
+  }
+  return {
+    frames: N, frameMatchPct: pct(match, N),
+    errPx: Object.fromEntries(Object.entries(errs).map(([k, v]) => [k, { median: q(v, 0.5), p95: q(v, 0.95), n: v.length }])),
+    presenceAgreePct: Object.fromEntries(Object.entries(agree).map(([k, v]) => [k, pct(v, N)])),
+  };
+}
+
+async function readFrames(src, count, fps, onFrame) {
+  const v = document.createElement("video");
+  v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = src;
+  await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error("cannot decode video")); });
+  const cv = $("cv"); cv.width = v.videoWidth; cv.height = v.videoHeight;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  let prev = null, still = 0;
+  for (let i = 0; i < count; i++) {
+    await new Promise(res => {
+      let n = 0; const fin = () => { if (++n === 2) res(); };
+      if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(fin); else n++;
+      v.onseeked = fin; v.currentTime = (i + 0.5) / fps;
+    });
+    ctx.drawImage(v, 0, 0, cv.width, cv.height);
+    // guard: a browser that does not repaint on seek would feed the same frame again and again
+    const px = ctx.getImageData(0, 0, cv.width, cv.height).data; let sig = 0;
+    for (let k = 0; k < px.length; k += 4099) sig += px[k];
+    if (prev !== null && sig === prev) still++; prev = sig;
+    if (i > 15 && still > i * 0.8) throw new Error("This browser does not repaint video frames on seek; use another browser.");
+    await onFrame(cv, i);
+  }
+  return [cv.width, cv.height];
+}
+
+async function readImageFrames(pattern, count, onFrame) {
+  const cv = $("cv"); let ctx = null;
+  for (let i = 0; i < count; i++) {
+    const blob = await (await realFetch(pattern.replace("{i}", String(i).padStart(4, "0")))).blob();
+    const bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+    if (!ctx) { cv.width = bmp.width; cv.height = bmp.height; ctx = cv.getContext("2d", { willReadFrequently: true }); }
+    ctx.drawImage(bmp, 0, 0); bmp.close();
+    await onFrame(cv, i);
+  }
+  return [cv.width, cv.height];
+}
+
+async function runAll(items, delegates) {
+  const rows = [], env = { userAgent: navigator.userAgent, subset: SUBSET_VERSION, lib: LIB, date: new Date().toISOString() };
+  for (const it of items) {
+    const exs = [];
+    for (const d of delegates) exs.push(await createExtractor({ lib: LIB, models: MODELS, delegate: d }));
+    const outs = exs.map(() => []);
+    $("status").textContent = `Processing ${it.name} …`;
+    const onFrame = async (cv, i) => {
+      const ts = Math.round(i * 1000 / it.ref.fps);
+      exs.forEach((ex, k) => outs[k].push(ex.processFrame(cv, i, ts)));
+    };
+    const [W, H] = it.frames ? await readImageFrames(it.frames, it.ref.frames, onFrame)
+                             : await readFrames(it.src, it.ref.frames, it.ref.fps, onFrame);
+    exs.forEach((ex, k) => {
+      const c = compare(it.ref.data, outs[k], W, H);
+      rows.push({ clip: it.name, delegate: ex.delegate, ...c });
+      ex.close();
+    });
+    if (delegates.length === 2) rows.push({ clip: it.name, delegate: "CPU vs GPU", ...compare(outs[0], outs[1], W, H) });
+    render(rows, env);
+  }
+  return { env, rows };
+}
+
+function render(rows, env) {
+  const tb = $("tbl").querySelector("tbody"); tb.innerHTML = "";
+  const f = e => e.median === null ? "–" : `${e.median} / ${e.p95}`;
+  for (const r of rows) {
+    const cls = r.frameMatchPct >= 95 ? "ok" : "bad", a = r.presenceAgreePct;
+    tb.insertAdjacentHTML("beforeend", `<tr><td>${r.clip}</td><td>${r.delegate}</td><td>${r.frames}</td><td class="${cls}">${r.frameMatchPct}%</td>
+      <td>${f(r.errPx.pose)}</td><td>${f(r.errPx.hands)}</td><td>${f(r.errPx.face)}</td><td>${a.pose}/${a.L}/${a.R}/${a.face}</td></tr>`);
+  }
+  window.__parity = { env, rows };
+  $("out").textContent = JSON.stringify({ env, rows }, null, 1);
+  $("copy").disabled = false;
+}
+
+// headless mode: ?auto=1&clips=a.mp4,b.mp4&refs=a.json,b.json&dels=CPU,GPU
+async function autoRun() {
+  const clips = params.get("clips").split(","), refs = params.get("refs").split(",");
+  const items = [];
+  for (let k = 0; k < clips.length; k++) {
+    const ref = await (await realFetch(refs[k])).json();
+    items.push({ name: ref.clip, src: clips[k], ref, frames: params.get("frames") ? params.get("frames").replace("{clip}", ref.clip.replace(/\.mp4$/, "")) : null });
+  }
+  const res = await runAll(items, (params.get("dels") || "CPU,GPU").split(","));
+  $("status").textContent = "Done."; window.__done = res;
+}
+
+$("run").onclick = async () => {
+  try {
+    const clips = [...$("clips").files], refs = [...$("refs").files];
+    if (!clips.length || !refs.length) throw new Error("Pick the clips and the Python JSON files first.");
+    const items = [];
+    for (const c of clips) {
+      const base = c.name.replace(/\.mp4$/i, "");
+      const rf = refs.find(r => r.name.startsWith(base + "."));
+      if (!rf) throw new Error(`No Python result for ${c.name}`);
+      items.push({ name: c.name, src: URL.createObjectURL(c), ref: JSON.parse(await rf.text()) });
+    }
+    await runAll(items, $("dels").value.split(","));
+    const rows = window.__parity.rows.filter(r => r.delegate !== "CPU vs GPU");
+    const pass = rows.every(r => r.frameMatchPct >= 95);
+    $("status").innerHTML = pass ? `<span class="ok">Done: all clips ≥ 95% → parity passes.</span>` : `<span class="bad">Done: some clips below 95%.</span>`;
+  } catch (e) { $("status").innerHTML = `<span class="bad">Error: ${e.message}</span>`; console.error(e); }
+};
+$("copy").onclick = async () => {
+  const rows = window.__parity.rows.map(r => ({ clip: r.clip, delegate: r.delegate, frames: r.frames, match: r.frameMatchPct, errPx: r.errPx, presence: r.presenceAgreePct }));
+  const txt = JSON.stringify({ env: window.__parity.env, rows });
+  try { await navigator.clipboard.writeText(txt); $("copy").textContent = "Copied ✓"; } catch { $("copy").textContent = "Select the summary box and copy"; }
+};
+if (params.get("auto")) autoRun().catch(e => { window.__done = { error: String(e) }; console.error(e); });
+</script>
+</body>
+</html>
