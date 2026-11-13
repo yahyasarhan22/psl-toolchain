@@ -71,10 +71,28 @@ Per frame, 80 landmarks / 257 values:
 | Input frames | unmirrored, RGB; video preprocessed by A1 (rotation applied, SDR, 30 fps) |
 | Delegate | browser: GPU, CPU fallback · Python: CPU |
 
-## 5. Parity test (to do)
+## 5. Face from a head crop (found during parity)
 
-5 clips from dataset v1 → same frames through Python and the browser → compare per-landmark error and detection agreement. Pass rule: to be filled with the result.
+Dataset v1 is filmed full-body: the face is only ~75–95 px wide in a 720 px frame. FaceLandmarker on the full frame found the face in **0% of frames in 3 of 5 parity clips**. Both extractors now cut a square around the head from the pose points (side = 3 × head width, min 64 px), run FaceLandmarker (IMAGE mode) on that crop and map the points back. Face found: 83–100% (the 83% clip is the sign "head", where the hand covers the face). Same integer maths in `python/extract_landmarks.py` and `web/landmarks.js`.
 
-## 6. Python environment (to do)
+## 6. Parity test
 
-`requirements.txt` with exact versions and the Python version used.
+5 clips from dataset v1, one per signer and category: pain (S8), where (S5), head (S2), letter ha (S3), number 7 (S6). Converted like A1 (rotation applied, HLG → SDR BT.709, 30 fps, 720×1280 H.264, muted).
+
+**Run 1, 13 Nov 2026: headless Chrome in a Linux container, identical PNG frames on both sides** (`parity_results/2026-11-13_headless_chrome.json`). A frame matches when every block is found on both sides or missing on both, and each found block is within 1% of frame width (7.2 px) on average.
+
+| Comparison | Frames matching (451 frames) | Hands err median | Face err median | Pose err median |
+|---|---|---|---|---|
+| Python ↔ browser **CPU** | **96.2%** ✓ (per clip 90.0–100) | 0.04–0.5 px | 0.1–0.4 px | 1.0–2.5 px |
+| Python ↔ browser GPU (SwiftShader software emulation) | 83.2% | 0.3–2.7 px | 0.3–0.6 px | 3.6–5.2 px |
+
+- On CPU the two runtimes give the same landmarks; remaining mismatches are borderline detections (a resting hand at the edge of the 0.5 threshold, the hand over the face in "head").
+- The GPU delegate computes with lower precision, so borderline detections flip more often. SwiftShader is not a real GPU, so this number is only a warning. Run 2 measures real devices.
+
+**Run 2 (to do): real browsers.** Laptop Chrome and the iPhone, CPU and GPU, with `web/parity/` (video frames decoded by the browser, as in the live app). Decision rule: if real-GPU parity is < 95%, measure the final pipeline on the phone with the CPU delegate; use CPU if it holds ≥ 15 FPS, otherwise keep GPU and report the parity number.
+
+Note: headless Chrome in the container does not repaint video frames on seek (it fed the same frame every time); the parity page now refuses to run in a browser that does this.
+
+## 7. Python environment
+
+`python/requirements.txt`: `mediapipe==1.2.3`, `opencv-contrib-python==5.0.0.93`, `numpy==2.2.6` (Python 3.10–3.13). Run 1 used Python 3.13 on Linux x86-64. On a Linux machine without graphics, MediaPipe needs `libEGL.so.1` (package `libegl1`); Windows does not.

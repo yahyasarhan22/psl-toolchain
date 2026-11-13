@@ -44,19 +44,11 @@
 <script type="module">
 const params = new URLSearchParams(location.search);
 const LIB = params.get("lib") || "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/";
-const MODELS = params.get("models") || "https://storage.googleapis.com/mediapipe-models/__by_name__/";
-const MODEL_URLS = {
-  "hand_landmarker.task": "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
-  "pose_landmarker_lite.task": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task",
-  "face_landmarker.task": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
-};
+const MODELS = params.get("models") || "../../models/";
+
 const { createExtractor, SUBSET_VERSION } = await import(params.get("mod") || "../landmarks.js");
 
-// models: either a base URL holding all three files, or the official URLs
 const realFetch = window.fetch.bind(window);
-if (!params.get("models")) window.fetch = (u, o) => {
-  const m = String(u).match(/__by_name__\/(.+)$/); return realFetch(m ? MODEL_URLS[m[1]] : u, o);
-};
 
 const $ = id => document.getElementById(id);
 const BLOCKS = { pose: [0, 68, 4], L: [68, 131, 3], R: [131, 194, 3], face: [194, 257, 3] };
