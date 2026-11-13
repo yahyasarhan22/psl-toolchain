@@ -30,19 +30,23 @@
 </head>
 <body>
 <h1>PSL T1 · Phone FPS test</h1>
-<p class="sub">MediaPipe Tasks Vision <b>1.2.3</b> (pinned). Prop the phone up, stand ~1.5 m away so your head, chest and both hands are in view, and sign or move your hands the whole time.</p>
+<p class="sub">Version 2 · MediaPipe Tasks Vision <b>1.2.3</b> (pinned). Prop the phone up, stand ~1.5 m away so your head, chest and both hands are in view, and sign or move your hands the whole time.</p>
 
 <div class="card">
   <div class="row">
     <label>Camera <select id="facing"><option value="user">Front</option><option value="environment">Back</option></select></label>
     <label>Delegate <select id="delegate"><option>GPU</option><option>CPU</option></select></label>
-    <label>Seconds per test <select id="secs"><option>10</option><option selected>15</option><option>30</option></select></label>
+    <label>Seconds per test <select id="secs"><option>10</option><option>15</option><option selected>30</option></select></label>
+    <label><input type="checkbox" id="drawOn" checked> Draw points</label>
   </div>
   <div class="row" style="margin-top:8px">
-    <button class="primary" id="runAll">Run all 3 tests</button>
+    <input id="cond" placeholder="Notes: e.g. Low Power off, Safari, window light" style="flex:1;min-width:220px;font:inherit;border-radius:8px;border:1px solid #2c313c;background:#222631;color:var(--fg);padding:8px">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="primary" id="runAll">Run all 5 tests</button>
     <button id="copy" disabled>Copy results</button>
   </div>
-  <div id="status">Tap "Run all 3 tests" and allow the camera.</div>
+  <div id="status">Tap "Run all 5 tests" and allow the camera.</div>
   <div id="live"></div>
 </div>
 
@@ -65,8 +69,8 @@
 </div>
 
 <script type="module">
-const VER = "1.2.3";
-const { FilesetResolver, HolisticLandmarker, HandLandmarker, PoseLandmarker } =
+const VER = "1.2.3"; const PAGE_VERSION = 2;
+const { FilesetResolver, HolisticLandmarker, HandLandmarker, PoseLandmarker, FaceLandmarker } =
   await import(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/vision_bundle.mjs`);
 
 const M = "https://storage.googleapis.com/mediapipe-models";
@@ -75,7 +79,9 @@ const MODELS = {
   hand:      `${M}/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task`,
   pose_full: `${M}/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task`,
   pose_lite: `${M}/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task`,
+  face:      `${M}/face_landmarker/face_landmarker/float16/latest/face_landmarker.task`,
 };
+const SETUPS = ["Holistic", "Hand + Pose lite", "Hand + Pose lite + Face (every frame)", "Hand + Pose lite + Face (every 2nd frame)", "Hand + Pose lite + Face (every 3rd frame)"];
 
 const $ = id => document.getElementById(id);
 const video = $("video"), canvas = $("overlay"), ctx = canvas.getContext("2d");
@@ -133,25 +139,33 @@ async function makeSetup(name) {
     };
   }
   const poseKey = name.includes("full") ? "pose_full" : "pose_lite";
-  await loadModel("hand"); await loadModel(poseKey);
+  const faceEvery = name.includes("every frame") ? 1 : name.includes("2nd") ? 2 : name.includes("3rd") ? 3 : 0;
+  await loadModel("hand"); await loadModel(poseKey); if (faceEvery) await loadModel("face");
   const hand = await HandLandmarker.createFromOptions(vision, {
     baseOptions: baseOpts("hand"), runningMode: "VIDEO", numHands: 2,
   });
   const pose = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: baseOpts(poseKey), runningMode: "VIDEO", numPoses: 1,
   });
+  const face = faceEvery ? await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: baseOpts("face"), runningMode: "VIDEO", numFaces: 1, outputFaceBlendshapes: false,
+  }) : null;
+  let k = 0, lastFace = null;
   return {
     run(ts) {
       const rh = hand.detectForVideo(video, ts);
       const rp = pose.detectForVideo(video, ts);
-      return { hands: rh.landmarks || [], pose: rp.landmarks?.[0], face: null, hasFace: false };
+      if (face && k % faceEvery === 0) lastFace = face.detectForVideo(video, ts).faceLandmarks?.[0] || null;
+      k++;
+      return { hands: rh.landmarks || [], pose: rp.landmarks?.[0], face: face ? lastFace : null, hasFace: !!face };
     },
-    close() { hand.close(); pose.close(); },
+    close() { hand.close(); pose.close(); face?.close(); },
   };
 }
 
 function draw(o) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!$("drawOn").checked) return;
   const dot = (p, c, r = 3) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p.x * canvas.width, p.y * canvas.height, r, 0, 7); ctx.fill(); };
   if (o.pose) o.pose.slice(0, 25).forEach(p => dot(p, "#5b8cff", 4));
   o.hands.forEach(h => h.forEach(p => dot(p, "#3ecf8e", 3)));
@@ -206,7 +220,7 @@ function render() {
       `<tr><td>${r.name}</td><td class="${cls}">${r.fps}</td><td>${r.mean} / ${r.p95}</td><td>${r.oneHand}</td><td>${r.twoHands}</td><td>${r.pose}</td><td>${r.face}</td></tr>`);
   }
   const report = {
-    test: "PSL T1 phone FPS", tasks_vision: VER, delegate: $("delegate").value,
+    test: "PSL T1 phone FPS", page_version: PAGE_VERSION, tasks_vision: VER, draw: $("drawOn").checked, conditions: $("cond").value, delegate: $("delegate").value,
     camera: camInfo, userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency,
     deviceMemoryGB: navigator.deviceMemory ?? null, date: new Date().toISOString(),
     results, models: Object.fromEntries(Object.entries(hashes).map(([k, v]) => [k, { url: MODELS[k], ...v }])),
@@ -223,7 +237,7 @@ $("runAll").onclick = async () => {
     $("status").textContent = "Loading MediaPipe…";
     vision ??= await FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}/wasm`);
     const secs = +$("secs").value;
-    for (const name of ["Holistic", "Hand + Pose (full)", "Hand + Pose (lite)"]) {
+    for (const name of SETUPS) {
       $("status").textContent = `Running: ${name}`;
       results.push(await runOne(name, secs));
       render();
